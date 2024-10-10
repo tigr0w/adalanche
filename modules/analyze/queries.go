@@ -3,6 +3,7 @@ package analyze
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/lkarlslund/adalanche/modules/engine"
+	"github.com/lkarlslund/adalanche/modules/query"
 )
 
 // Can return built in queries and user defined persisted queries
@@ -29,6 +30,8 @@ type QueryDefinition struct {
 	MinAccumulatedProbability engine.Probability `json:"min_accumulated_probability,omitempty,string"`
 	PruneIslands              bool               `json:"prune_islands,omitempty"`
 	DontExpandAUEO            bool               `json:"dont_expand_aueo,omitempty"`
+
+	UserDefined bool `json:"user_defined,omitempty"`
 }
 
 func DefaultQueryDefinition() QueryDefinition {
@@ -44,8 +47,31 @@ func (q QueryDefinition) ID() string {
 	return q.Name
 }
 
-func (qd QueryDefinition) AnalysisOptions() AnalyzeOptions {
+func (qd QueryDefinition) AnalysisOptions(ao *engine.Objects) (AnalyzeOptions, error) {
 	aoo := NewAnalyzeObjectsOptions()
+
+	filter, err := query.ParseLDAPQueryStrict(qd.QueryFirst, ao)
+	if err != nil {
+		return aoo, err
+	}
+	aoo.FilterFirst = filter
+
+	if qd.QueryMiddle != "" {
+		filter, err = query.ParseLDAPQueryStrict(qd.QueryMiddle, ao)
+		if err != nil {
+			return aoo, err
+		}
+		aoo.FilterMiddle = filter
+	}
+
+	if qd.QueryLast != "" {
+		filter, err = query.ParseLDAPQueryStrict(qd.QueryLast, ao)
+		if err != nil {
+			return aoo, err
+		}
+		aoo.FilterLast = filter
+	}
+
 	aoo.MaxDepth = qd.MaxDepth
 	aoo.MaxOutgoingConnections = qd.MaxOutgoingConnections
 	aoo.Direction = qd.Direction
@@ -55,7 +81,7 @@ func (qd QueryDefinition) AnalysisOptions() AnalyzeOptions {
 	aoo.PruneIslands = qd.PruneIslands
 	// aoo.NodeLimit: qd.NodeLimit,
 	aoo.DontExpandAUEO = qd.DontExpandAUEO
-	return aoo
+	return aoo, nil
 }
 
 var (
@@ -98,8 +124,15 @@ var (
 			Direction:  engine.In,
 		},
 		{
-			Name:       "ESC1 vulnerable certificate templates (pose as anyone)",
+			Name:       "Enroll in ESC1 vulnerable certificate templates (client auth + pose as anyone)",
 			QueryFirst: "(&(type=PKI-Certificate-Template)(msPKI-Certificate-Name-Flag:and:=1)(|(pKIExtendedKeyUsage=1.3.6.1.5.5.7.3.2)(pKIExtendedKeyUsage=1.3.5.1.5.2.3.4)(pKIExtendedKeyUsage=1.3.6.1.4.1.311.20.2.2)(pKIExtendedKeyUsage=2.5.29.37.0)(pKIExtendedKeyUsage:count:=0)))",
+			EdgesFirst: []string{"CertificateEnroll"},
+			Direction:  engine.In,
+		},
+		{
+			Name:       "Enroll in ESC15 vulnerable certificate templates (v1 + pose as anyone)",
+			QueryFirst: "(&(type=PKI-Certificate-Template)(msPKI-Certificate-Name-Flag:and:=1)(msPKI-Template-Schema-Version=1))",
+			EdgesFirst: []string{"CertificateEnroll"},
 			Direction:  engine.In,
 		},
 		{
