@@ -225,7 +225,8 @@ function registerDefaultNodeLegendEntries() {
     icon: "icons/certificate.svg",
     description: "Certificate templates.",
   });
-  registerNodeLegendEntry("DNS-Node", {
+  registerNodeLegendEntry("Dns-Node", {
+    label: "DNS-Node",
     color: "",
     icon: "icons/dns.svg",
     description: "DNS records and nodes.",
